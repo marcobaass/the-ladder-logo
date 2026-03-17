@@ -52,7 +52,6 @@ export async function initParticles(scene: THREE.Scene) {
   gltf.scene.rotation.x = -Math.PI * 0.03
   gltf.scene.updateMatrixWorld(true)
 
-  // Merge all meshes into one for the surface sampler
   const meshes: THREE.Mesh[] = []
   gltf.scene.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
@@ -60,43 +59,52 @@ export async function initParticles(scene: THREE.Scene) {
     }
   })
 
-  // Sampling points across the surface of each mesh
-  const modelPoints: { x: number; y: number; z: number }[] = []
+  // Oversample the surface, snap to grid, and deduplicate
+  const snap = 0.12
+  const uniqueGrid = new Map<string, { x: number; y: number; z: number }>()
   const tempPos = new THREE.Vector3()
+
   for (const mesh of meshes) {
     const sampler = new MeshSurfaceSampler(mesh).build()
-    const samplesForThisMesh = Math.floor(COUNT / meshes.length)
-    for (let i = 0; i < samplesForThisMesh; i++) {
+
+    for (let i = 0; i < COUNT * 20; i++) {
       sampler.sample(tempPos)
       mesh.localToWorld(tempPos)
-      const snap = 0.1  // grid cell size — smaller = finer grid
-      modelPoints.push({
-        x: Math.round(tempPos.x / snap) * snap,
-        y: Math.round(tempPos.y / snap) * snap,
-        z: Math.round(tempPos.z / snap) * snap,
-      })
+
+      const gy = Math.round(tempPos.y / snap) * snap
+      const rowIndex = Math.round(tempPos.y / snap)
+      const offset = (rowIndex % 2) * snap * 0.5
+      const gx = Math.round((tempPos.x - offset) / snap) * snap + offset
+      const gz = Math.round(tempPos.z / snap) * snap
+      const key = `${gx},${gy},${gz}`
+
+      if (!uniqueGrid.has(key)) {
+        uniqueGrid.set(key, { x: gx, y: gy, z: gz })
+      }
     }
   }
-  // Fill remaining if COUNT wasn't evenly divisible
-  while (modelPoints.length < COUNT) {
-    const sampler = new MeshSurfaceSampler(meshes[0]).build()
-    sampler.sample(tempPos)
-    meshes[0].localToWorld(tempPos)
-    const snap = 0.1
-    modelPoints.push({
-      x: Math.round(tempPos.x / snap) * snap,
-      y: Math.round(tempPos.y / snap) * snap,
-      z: Math.round(tempPos.z / snap) * snap,
-    })
-  }
 
-  modelPoints.sort((a, b) => a.y - b.y)
+  const modelPoints = Array.from(uniqueGrid.values())
+  const usableCount = Math.min(modelPoints.length, COUNT)
+  console.log('Unique grid points:', modelPoints.length, 'usable:', usableCount, 'COUNT:', COUNT)
+
+  while (modelPoints.length < COUNT) {
+    modelPoints.push({ x: 0, y: 0, z: 0 })
+  }
+  modelPoints.length = COUNT
+
+  modelPoints.sort((a, b) => {
+    const aZero = (a.x === 0 && a.y === 0 && a.z === 0) ? 1 : 0
+    const bZero = (b.x === 0 && b.y === 0 && b.z === 0) ? 1 : 0
+    if (aZero !== bZero) return aZero - bZero
+    return a.y - b.y
+  })
 
   const waveYPositions: { idx: number; waveY: number }[] = []
   for (let i = 0; i < COUNT; i++) {
     waveYPositions.push({
-    idx: i,
-    waveY: start[i * 3 + 1]
+      idx: i,
+      waveY: start[i * 3 + 1]
     })
   }
   waveYPositions.sort((a, b) => a.waveY - b.waveY)
@@ -112,7 +120,6 @@ export async function initParticles(scene: THREE.Scene) {
     index[particleIdx] = i / (COUNT - 1)
   }
 
-
   // Three.js Points needs 'position' attribute to know vertex count
   geometry.setAttribute('position', new THREE.BufferAttribute(start, 3))
   geometry.setAttribute('aStartPosition', new THREE.BufferAttribute(start, 3))
@@ -124,12 +131,14 @@ export async function initParticles(scene: THREE.Scene) {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    dithering: true,
     uniforms: {
       uTime: { value: 0 },
       uProgress: { value: 0 },
       uSize: { value: 60 },
       uTargetScale: { value: 0.5 },
       uTargetOffset: { value: new THREE.Vector3(0, -5, 0) }, // offset for the ladder
+      uKeepRatio: { value: usableCount / COUNT },
     },
     vertexShader,
     fragmentShader

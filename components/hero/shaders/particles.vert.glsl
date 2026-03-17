@@ -3,6 +3,7 @@ uniform float uProgress;
 uniform float uSize;
 uniform float uTargetScale;
 uniform vec3 uTargetOffset;
+uniform float uKeepRatio;
 
 attribute vec3 aStartPosition;
 attribute vec3 aTargetPosition;
@@ -30,8 +31,8 @@ void main() {
 
   // 3. Get target position
   vec3 targetPos = aTargetPosition * uTargetScale + uTargetOffset;
-  // targetPos.y += sin(uTime * 0.5 + aRandom * 6.28) * 0.1;
-  // targetPos.x += cos(uTime * 0.5 + aRandom * 6.28) * 0.1;
+  targetPos.y += sin(uTime * 0.5 + targetPos.x * 2.0) * 0.025;
+  targetPos.x += cos(uTime * 0.5 + targetPos.y * 2.0) * 0.025;
   // 4. Blend between wave and target
   vec3 pos = mix(wavePos, targetPos, particleProgress);
 
@@ -41,5 +42,6 @@ void main() {
   gl_Position = projectionMatrix * viewPosition;
 
   gl_PointSize = uSize * (1.0 / -viewPosition.z);
-  vAlpha = 1.0;
+  float fadeOut = aIndex > uKeepRatio ? particleProgress : 0.0;
+  vAlpha = 1.0 - fadeOut;
 }
