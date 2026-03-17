@@ -1,9 +1,8 @@
 uniform float uTime;
 uniform float uProgress;
 uniform float uSize;
-uniform float uTorusZ;
-uniform float uTorusScale;
-uniform vec2 uTorusOffset;
+uniform float uTargetScale;
+uniform vec3 uTargetOffset;
 
 attribute vec3 aStartPosition;
 attribute vec3 aTargetPosition;
@@ -29,19 +28,12 @@ void main() {
   wavePos.y += wave * 0.2;
   wavePos.y += sin(uTime * 0.3 + aRandom * 6.28) * 0.015;
 
-  // 3. Get torus position
-  vec3 torusPos = aTargetPosition * uTorusScale;
-  torusPos.y += uTorusOffset.x;
-  torusPos.z += uTorusOffset.y + uTorusZ;
-
-  torusPos.y += sin(uTime * 0.5 + aRandom * 6.28) * 0.1;
-  torusPos.x += cos(uTime * 0.5 + aRandom * 6.28) * 0.1;
-
-  // 4. Blend between wave and torus based on this particle's progress
-  vec3 pos = mix(wavePos, torusPos, particleProgress);
-
-  // 5. Gradually move particles toward camera as they transition
-  pos.z += particleProgress * uTorusZ * 0.5;
+  // 3. Get target position
+  vec3 targetPos = aTargetPosition * uTargetScale + uTargetOffset;
+  // targetPos.y += sin(uTime * 0.5 + aRandom * 6.28) * 0.1;
+  // targetPos.x += cos(uTime * 0.5 + aRandom * 6.28) * 0.1;
+  // 4. Blend between wave and target
+  vec3 pos = mix(wavePos, targetPos, particleProgress);
 
   // 6. Transform to screen coordinates
   vec4 modelPosition = modelMatrix * vec4(pos, 1.0);

@@ -12,24 +12,28 @@ export default function HeroScene() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const { scene, camera, renderer } = initScene(canvas);
-    const particles = initParticles(scene);
-    const cleanupScroll = initScroll(particles.material);
-
     let frameId: number;
-    function animate(time: number = 0) {
-      particles.material.uniforms.uTime.value = time * 0.001;
-      renderer.render(scene, camera);
-      frameId = requestAnimationFrame(animate);
-    }
-    animate();
-
+    let cleanupScroll: (() => void) | undefined;
+    let particles: Awaited<ReturnType<typeof initParticles>> | undefined;
+    let cancelled = false;
+    const { scene, camera, renderer } = initScene(canvas);
+    initParticles(scene).then((p) => {
+      if (cancelled) return;
+      particles = p;
+      cleanupScroll = initScroll(particles.material);
+      function animate(time: number = 0) {
+        particles!.material.uniforms.uTime.value = time * 0.001;
+        renderer.render(scene, camera);
+        frameId = requestAnimationFrame(animate);
+      }
+      animate();
+    });
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frameId);
-      cleanupScroll();
-      particles.geometry.dispose();
-      particles.material.dispose();
+      cleanupScroll?.();
+      particles?.geometry.dispose();
+      particles?.material.dispose();
       renderer.dispose();
     };
   }, []);

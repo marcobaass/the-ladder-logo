@@ -2,13 +2,14 @@ import * as THREE from 'three'
 import vertexShader from './shaders/particles.vert.glsl'
 import fragmentShader from './shaders/particles.frag.glsl'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 
 
 // Grid dimensions for wave surface
 const GRID_SIZE = 75
 const COUNT = GRID_SIZE * GRID_SIZE
 
-export function initParticles(scene: THREE.Scene) {
+export async function initParticles(scene: THREE.Scene) {
   const geometry = new THREE.BufferGeometry()
   
   const start = new Float32Array(COUNT * 3)
@@ -44,93 +45,70 @@ export function initParticles(scene: THREE.Scene) {
   }
   
   const loader = new GLTFLoader()
-  loader.load('/model/the-ladder.glb', (gltf) => {
-    // Make it visible without lights by switching to basic material
-    gltf.scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).material = new THREE.MeshBasicMaterial({ color: 0xffffff })
-      }
-    })
-    
-    // Log bounding box to check size/position
-    const box = new THREE.Box3().setFromObject(gltf.scene)
-    console.log('Size:', box.getSize(new THREE.Vector3()))
-    console.log('Center:', box.getCenter(new THREE.Vector3()))
-
-    gltf.scene.rotation.y = Math.PI * 0.5
-    gltf.scene.rotation.x = -Math.PI * 0.06
-    
-    scene.add(gltf.scene)
-  })
+  const gltf = await loader.loadAsync('/model/the-ladder.glb')
   
-  // Torus parameters
-  const torusRadius = 2    // Main radius (center to tube center)
-  const tubeRadius = 0.8   // Tube radius
+  // Rotation of the ladder frontal
+  gltf.scene.rotation.y = Math.PI * 0.5
+  gltf.scene.rotation.x = -Math.PI * 0.03
+  gltf.scene.updateMatrixWorld(true)
 
-  // Offset to center the torus on screen (moved to shader uniform)
-  const torusOffsetY = -3
-  const torusOffsetZ = -6
-
-  // Generate torus points parametrically with biased distribution
-  // More particles on outer (v=0) and inner (v=π) edges of the tube
-  const torusPoints: { x: number; y: number; z: number }[] = []
-  for (let i = 0; i < COUNT; i++) {
-    // u = angle around the main ring (uniform distribution)
-    const u = Math.random() * Math.PI * 2
-
-    // v = angle around the tube cross-section (biased toward 0 and π)
-    // This clusters particles at outer (v=0) and inner (v=π) edges
-    let v
-    if (Math.random() < 0.70) {
-      // Cluster near outer edge (v = 0)
-      v = (Math.pow(Math.random(), 0.5) - 0.75) * Math.PI * 0.75
-    } else {
-      // Cluster near inner edge (v = π)
-      v = Math.PI + (Math.pow(Math.random(), 0.5) - 0.75) * Math.PI * 0.75
+  // Merge all meshes into one for the surface sampler
+  const meshes: THREE.Mesh[] = []
+  gltf.scene.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      meshes.push(child as THREE.Mesh)
     }
+  })
 
-    // Parametric torus equations
-    const x = (torusRadius + tubeRadius * Math.cos(v)) * Math.cos(u)
-    const y = (torusRadius + tubeRadius * Math.cos(v)) * Math.sin(u)
-    const z = tubeRadius * Math.sin(v)
-
-    // Add small jitter
-    const jitter = 0.05
-    torusPoints.push({
-      x: x + (Math.random() - 0.5) * jitter,
-      y: y + (Math.random() - 0.5) * jitter,
-      z: z + (Math.random() - 0.5) * jitter
+  // Sampling points across the surface of each mesh
+  const modelPoints: { x: number; y: number; z: number }[] = []
+  const tempPos = new THREE.Vector3()
+  for (const mesh of meshes) {
+    const sampler = new MeshSurfaceSampler(mesh).build()
+    const samplesForThisMesh = Math.floor(COUNT / meshes.length)
+    for (let i = 0; i < samplesForThisMesh; i++) {
+      sampler.sample(tempPos)
+      mesh.localToWorld(tempPos)
+      const snap = 0.1  // grid cell size — smaller = finer grid
+      modelPoints.push({
+        x: Math.round(tempPos.x / snap) * snap,
+        y: Math.round(tempPos.y / snap) * snap,
+        z: Math.round(tempPos.z / snap) * snap,
+      })
+    }
+  }
+  // Fill remaining if COUNT wasn't evenly divisible
+  while (modelPoints.length < COUNT) {
+    const sampler = new MeshSurfaceSampler(meshes[0]).build()
+    sampler.sample(tempPos)
+    meshes[0].localToWorld(tempPos)
+    const snap = 0.1
+    modelPoints.push({
+      x: Math.round(tempPos.x / snap) * snap,
+      y: Math.round(tempPos.y / snap) * snap,
+      z: Math.round(tempPos.z / snap) * snap,
     })
   }
 
-  // Sort torus points by Y (bottom to top)
-  torusPoints.sort((a, b) => a.y - b.y)
+  modelPoints.sort((a, b) => a.y - b.y)
 
-  // Create array of particle indices with their wave Y positions
   const waveYPositions: { idx: number; waveY: number }[] = []
   for (let i = 0; i < COUNT; i++) {
     waveYPositions.push({
-      idx: i,
-      waveY: start[i * 3 + 1]  // Y component of wave position
+    idx: i,
+    waveY: start[i * 3 + 1]
     })
   }
-
-  // Sort by wave Y (lowest Y = bottom of wave = animates first)
   waveYPositions.sort((a, b) => a.waveY - b.waveY)
 
-  // Assign torus positions and index:
-  // - Particle with lowest wave Y gets lowest torus Y (both bottoms match)
-  // - Index based on wave Y position
   for (let i = 0; i < COUNT; i++) {
     const particleIdx = waveYPositions[i].idx
     const i3 = particleIdx * 3
 
-    // Assign sorted torus position (raw, centered at origin - offset applied in shader)
-    target[i3 + 0] = torusPoints[i].x
-    target[i3 + 1] = torusPoints[i].y
-    target[i3 + 2] = torusPoints[i].z
+    target[i3 + 0] = modelPoints[i].x
+    target[i3 + 1] = modelPoints[i].y
+    target[i3 + 2] = modelPoints[i].z
 
-    // Assign index (0 = animates first, 1 = animates last)
     index[particleIdx] = i / (COUNT - 1)
   }
 
@@ -150,9 +128,8 @@ export function initParticles(scene: THREE.Scene) {
       uTime: { value: 0 },
       uProgress: { value: 0 },
       uSize: { value: 60 },
-      uTorusZ: { value: 4 },
-      uTorusScale: { value: 0.5 },  // 1.0 = normal size, 0.5 = half, 2.0 = double
-      uTorusOffset: { value: new THREE.Vector2(torusOffsetY, torusOffsetZ) }  // Y and Z offset
+      uTargetScale: { value: 0.5 },
+      uTargetOffset: { value: new THREE.Vector3(0, -5, 0) }, // offset for the ladder
     },
     vertexShader,
     fragmentShader
