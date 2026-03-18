@@ -13,6 +13,9 @@ attribute float aRandom;
 attribute float aIndex;
 
 varying float vAlpha;
+varying float vEdgeFactor;
+varying float vProgress;
+varying float vLightDist;
 
 void main() {
   // 1. Calculate staggered progress for THIS particle
@@ -38,8 +41,7 @@ void main() {
   edgeFactor = clamp(edgeFactor, 0.0, 1.0);
   edgeFactor = pow(edgeFactor, 3.0);
 
-  targetPos.y += sin(uTime * 1.0 + targetPos.x * 12.0) * 0.035 * edgeFactor;
-  targetPos.x += cos(uTime * 1.0 + targetPos.y * 8.0) * 0.025 * edgeFactor;
+  targetPos.x += sin(uTime * 2.0 + targetPos.y * 4.0) * 0.06 * edgeFactor;
 
   // 4. Blend between wave and target
   vec3 pos = mix(wavePos, targetPos, particleProgress);
@@ -49,11 +51,17 @@ void main() {
   vec4 viewPosition = viewMatrix * modelPosition;
   gl_Position = projectionMatrix * viewPosition;
 
+  // Varyings
+  vEdgeFactor = edgeFactor;
+  vProgress = particleProgress;
+  vLightDist = length(aTargetPosition.xy - uModelCenter) / uEdgeRadius;
+
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
   float sizeFactor = mix(1.0, 0.6, particleProgress);
   gl_PointSize = uSize * sizeFactor * (1.0 / -viewPosition.z);
 
   // fading out overhang of pixels
-  float fadeOut = aIndex > uKeepRatio ? particleProgress : 0.0;
+  float fadeProgress = smoothstep(0.0, 0.5, uProgress);
+  float fadeOut = aIndex > uKeepRatio ? fadeProgress : 0.0;
   vAlpha = 1.0 - fadeOut;
 }

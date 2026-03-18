@@ -60,7 +60,7 @@ export async function initParticles(scene: THREE.Scene) {
   })
 
   // Oversample the surface, snap to grid, and deduplicate
-  const snap = 0.12
+  const snap = 0.10
   const uniqueGrid = new Map<string, { x: number; y: number; z: number }>()
   const tempPos = new THREE.Vector3()
 
@@ -76,9 +76,8 @@ export async function initParticles(scene: THREE.Scene) {
       const offset = (rowIndex % 2) * snap * 0.5
       const gx = Math.round((tempPos.x - offset) / snap) * snap + offset
       const gz = Math.round(tempPos.z / snap) * snap
-      const key = `${gx},${gy},${gz}`
-
-      if (!uniqueGrid.has(key)) {
+      const key = `${gx},${gy}`
+      if (!uniqueGrid.has(key) || gz > uniqueGrid.get(key)!.z) {
         uniqueGrid.set(key, { x: gx, y: gy, z: gz })
       }
     }
