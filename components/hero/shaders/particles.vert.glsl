@@ -48,7 +48,15 @@ void main() {
   // 4. Blend between wave and target
   vec3 pos = mix(wavePos, targetPos, particleProgress);
 
-  // 6. Transform to screen coordinates
+  // Spiral progress
+  float spiralProgress = smoothstep(0.9, 1.0, particleProgress);
+  float spiralEnvelope = sin(spiralProgress * 3.14159);
+  float spiralAngle = spiralProgress * 6.28 * 1.0;
+  float spiralRadius = 1.0 * spiralEnvelope;
+  pos.x += cos(spiralAngle) * spiralRadius;
+  pos.z += sin(spiralAngle) * spiralRadius;
+
+  // transforming to screen coordinates
   vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
   vec4 viewPosition = viewMatrix * modelPosition;
   gl_Position = projectionMatrix * viewPosition;

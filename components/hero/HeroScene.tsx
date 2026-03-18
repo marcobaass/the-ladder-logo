@@ -28,6 +28,7 @@ export default function HeroScene() {
         const nx = (e.clientX / window.innerWidth) * 2 - 1
         const ny = -(e.clientY / window.innerHeight) * 2 + 1
         
+        // damp factor for constraining the light movement
         const dampFactor = 0.75
         const lightX = nx * dampFactor
         const lightY = ny * dampFactor
