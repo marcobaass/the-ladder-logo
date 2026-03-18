@@ -1,12 +1,10 @@
 import * as THREE from 'three'
 import vertexShader from './shaders/particles.vert.glsl'
 import fragmentShader from './shaders/particles.frag.glsl'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 
 
 // Grid dimensions for wave surface
-const GRID_SIZE = 75
+const GRID_SIZE = 79
 const COUNT = GRID_SIZE * GRID_SIZE
 
 export async function initParticles(scene: THREE.Scene) {
@@ -44,48 +42,50 @@ export async function initParticles(scene: THREE.Scene) {
     }
   }
   
-  const loader = new GLTFLoader()
-  const gltf = await loader.loadAsync('/model/the-ladder.glb')
-  
-  // Rotation of the ladder frontal
-  gltf.scene.rotation.y = Math.PI * 0.5
-  gltf.scene.rotation.x = -Math.PI * 0.03
-  gltf.scene.updateMatrixWorld(true)
+  const modelPoints: { x: number; y: number; z: number }[] = []
 
-  const meshes: THREE.Mesh[] = []
-  gltf.scene.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      meshes.push(child as THREE.Mesh)
-    }
-  })
+  const img = new Image()
+  img.src = '/model/the-ladder.png'
+  await new Promise(resolve => { img.onload = () => resolve() })
 
-  // Oversample the surface, snap to grid, and deduplicate
+  const canvas = document.createElement('canvas')
+  canvas.width = img.width
+  canvas.height = img.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  const imageData = ctx.getImageData(0, 0, img.width, img.height)
+
   const snap = 0.10
-  const uniqueGrid = new Map<string, { x: number; y: number; z: number }>()
-  const tempPos = new THREE.Vector3()
+  const logoScale = 10
+  const aspectRatio = img.width / img.height
 
-  for (const mesh of meshes) {
-    const sampler = new MeshSurfaceSampler(mesh).build()
+  const usedKeys = new Set<string>()
+  
+  for (let row = 0; row < img.height; row ++) {
+    const ny = 1 -row / img.height
+    const gy = Math.round(ny * logoScale / snap) * snap
+    const rowIndex = Math.round(ny * logoScale / snap)
+    const offset = (rowIndex % 2) * snap / 2
 
-    for (let i = 0; i < COUNT * 20; i++) {
-      sampler.sample(tempPos)
-      mesh.localToWorld(tempPos)
+    for (let col = 0; col < img.width; col ++) {
+      const pixelIndex = (row * img.width + col) * 4
+      const alpha = imageData.data[pixelIndex + 3]
+      if (alpha < 128) continue
 
-      const gy = Math.round(tempPos.y / snap) * snap
-      const rowIndex = Math.round(tempPos.y / snap)
-      const offset = (rowIndex % 2) * snap * 0.5
-      const gx = Math.round((tempPos.x - offset) / snap) * snap + offset
-      const gz = Math.round(tempPos.z / snap) * snap
+      const nx = col / img.width
+      const rawX = (nx - 0.5) * logoScale * aspectRatio
+      const gx = Math.round((rawX - offset) / snap) * snap + offset
+
       const key = `${gx},${gy}`
-      if (!uniqueGrid.has(key) || gz > uniqueGrid.get(key)!.z) {
-        uniqueGrid.set(key, { x: gx, y: gy, z: gz })
+      if (!usedKeys.has(key)) {
+        usedKeys.add(key)
+        modelPoints.push({ x: gx, y: gy, z: 0 })
       }
     }
   }
 
-  const modelPoints = Array.from(uniqueGrid.values())
   const usableCount = Math.min(modelPoints.length, COUNT)
-  console.log('Unique grid points:', modelPoints.length, 'usable:', usableCount, 'COUNT:', COUNT)
+  console.log('Image grid points:', modelPoints.length, 'usable:', usableCount, 'COUNT:', COUNT)
 
   const centerX = modelPoints.reduce((s, p) => s + p.x, 0) / modelPoints.length
   const centerY = modelPoints.reduce((s, p) => s + p.y, 0) / modelPoints.length
@@ -96,13 +96,13 @@ export async function initParticles(scene: THREE.Scene) {
 
 
   while (modelPoints.length < COUNT) {
-    modelPoints.push({ x: 0, y: 0, z: 0 })
+    modelPoints.push({ x: 0, y: 0, z: -999 })
   }
   modelPoints.length = COUNT
 
   modelPoints.sort((a, b) => {
-    const aZero = (a.x === 0 && a.y === 0 && a.z === 0) ? 1 : 0
-    const bZero = (b.x === 0 && b.y === 0 && b.z === 0) ? 1 : 0
+    const aZero = a.z === -999 ? 1 : 0
+    const bZero = b.z === -999 ? 1 : 0
     if (aZero !== bZero) return aZero - bZero
     return a.y - b.y
   })
@@ -142,8 +142,8 @@ export async function initParticles(scene: THREE.Scene) {
     uniforms: {
       uTime: { value: 0 },
       uProgress: { value: 0 },
-      uSize: { value: 90 },
-      uTargetScale: { value: 0.5 },
+      uSize: { value: 60 },
+      uTargetScale: { value: 0.35 },
       uTargetOffset: { value: new THREE.Vector3(0, -5, 0) }, // offset for the ladder
       uKeepRatio: { value: usableCount / COUNT },
       uEdgeRadius: { value: maxRadius },

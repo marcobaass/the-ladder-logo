@@ -19,7 +19,7 @@ varying float vLightDist;
 
 void main() {
   // 1. Calculate staggered progress for THIS particle
-  float stagger = 0.6;
+  float stagger = 0.3;
   float particleProgress = smoothstep(
     aIndex * stagger,
     aIndex * stagger + (1.0 - stagger),
