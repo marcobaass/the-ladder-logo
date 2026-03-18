@@ -4,6 +4,8 @@ uniform float uSize;
 uniform float uTargetScale;
 uniform vec3 uTargetOffset;
 uniform float uKeepRatio;
+uniform float uEdgeRadius;
+uniform vec2 uModelCenter;
 
 attribute vec3 aStartPosition;
 attribute vec3 aTargetPosition;
@@ -31,8 +33,14 @@ void main() {
 
   // 3. Get target position
   vec3 targetPos = aTargetPosition * uTargetScale + uTargetOffset;
-  targetPos.y += sin(uTime * 0.5 + targetPos.x * 2.0) * 0.025;
-  targetPos.x += cos(uTime * 0.5 + targetPos.y * 2.0) * 0.025;
+
+  float edgeFactor = length(aTargetPosition.xy - uModelCenter) / uEdgeRadius;
+  edgeFactor = clamp(edgeFactor, 0.0, 1.0);
+  edgeFactor = pow(edgeFactor, 3.0);
+
+  targetPos.y += sin(uTime * 1.0 + targetPos.x * 12.0) * 0.035 * edgeFactor;
+  targetPos.x += cos(uTime * 1.0 + targetPos.y * 8.0) * 0.025 * edgeFactor;
+
   // 4. Blend between wave and target
   vec3 pos = mix(wavePos, targetPos, particleProgress);
 
@@ -41,7 +49,11 @@ void main() {
   vec4 viewPosition = viewMatrix * modelPosition;
   gl_Position = projectionMatrix * viewPosition;
 
-  gl_PointSize = uSize * (1.0 / -viewPosition.z);
+  // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
+  float sizeFactor = mix(1.0, 0.6, particleProgress);
+  gl_PointSize = uSize * sizeFactor * (1.0 / -viewPosition.z);
+
+  // fading out overhang of pixels
   float fadeOut = aIndex > uKeepRatio ? particleProgress : 0.0;
   vAlpha = 1.0 - fadeOut;
 }

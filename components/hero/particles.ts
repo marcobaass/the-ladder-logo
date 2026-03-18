@@ -88,6 +88,14 @@ export async function initParticles(scene: THREE.Scene) {
   const usableCount = Math.min(modelPoints.length, COUNT)
   console.log('Unique grid points:', modelPoints.length, 'usable:', usableCount, 'COUNT:', COUNT)
 
+  const centerX = modelPoints.reduce((s, p) => s + p.x, 0) / modelPoints.length
+  const centerY = modelPoints.reduce((s, p) => s + p.y, 0) / modelPoints.length
+
+  const maxRadius = Math.max(
+    ...modelPoints.map(p => Math.sqrt((p.x - centerX) ** 2 + (p.y - centerY) ** 2))
+  )
+
+
   while (modelPoints.length < COUNT) {
     modelPoints.push({ x: 0, y: 0, z: 0 })
   }
@@ -135,10 +143,12 @@ export async function initParticles(scene: THREE.Scene) {
     uniforms: {
       uTime: { value: 0 },
       uProgress: { value: 0 },
-      uSize: { value: 60 },
+      uSize: { value: 90 },
       uTargetScale: { value: 0.5 },
       uTargetOffset: { value: new THREE.Vector3(0, -5, 0) }, // offset for the ladder
       uKeepRatio: { value: usableCount / COUNT },
+      uEdgeRadius: { value: maxRadius },
+      uModelCenter: { value: new THREE.Vector3(centerX, centerY) },
     },
     vertexShader,
     fragmentShader
