@@ -148,6 +148,8 @@ export async function initParticles(scene: THREE.Scene) {
       uKeepRatio: { value: usableCount / COUNT },
       uEdgeRadius: { value: maxRadius },
       uModelCenter: { value: new THREE.Vector3(centerX, centerY) },
+      uLightPosition: { value: new THREE.Vector2(centerX, centerY) },
+      uLightIntensity: { value: 0.0 },
     },
     vertexShader,
     fragmentShader
@@ -164,5 +166,5 @@ export async function initParticles(scene: THREE.Scene) {
 
   scene.add(points)
 
-  return { points, material, geometry }
+  return { points, material, geometry, centerX, centerY, maxRadius }
 }

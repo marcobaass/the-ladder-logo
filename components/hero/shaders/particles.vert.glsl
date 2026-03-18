@@ -6,6 +6,8 @@ uniform vec3 uTargetOffset;
 uniform float uKeepRatio;
 uniform float uEdgeRadius;
 uniform vec2 uModelCenter;
+uniform vec2 uLightPosition;
+uniform float uLightIntensity;
 
 attribute vec3 aStartPosition;
 attribute vec3 aTargetPosition;
@@ -54,7 +56,8 @@ void main() {
   // Varyings
   vEdgeFactor = edgeFactor;
   vProgress = particleProgress;
-  vLightDist = length(aTargetPosition.xy - uModelCenter) / uEdgeRadius;
+  vec2 screenPos = gl_Position.xy / gl_Position.w;
+  vLightDist = length(screenPos - uLightPosition) / 0.5;  
 
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
   float sizeFactor = mix(1.0, 0.6, particleProgress);
