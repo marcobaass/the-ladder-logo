@@ -16,6 +16,8 @@ export default function HeroScene() {
     let frameId: number;
     let cleanupScroll: (() => void) | undefined;
     let cleanupMouse: (() => void) | undefined;
+    let cleanupResize: (() => void) | undefined;
+
     let particles: Awaited<ReturnType<typeof initParticles>> | undefined;
     let cancelled = false;
     const { scene, camera, renderer } = initScene(canvas);
@@ -41,6 +43,12 @@ export default function HeroScene() {
       window.addEventListener('mousemove', onMouseMove)
       cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
       
+      const onResize = () => {
+        p.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
+      }
+      window.addEventListener('resize', onResize)
+      cleanupResize = () => window.removeEventListener('resize', onResize)
+
       function animate(time: number = 0) {
         particles!.material.uniforms.uTime.value = time * 0.001;
         renderer.render(scene, camera);
@@ -56,6 +64,7 @@ export default function HeroScene() {
       particles?.material.dispose();
       renderer.dispose();
       cleanupMouse?.();
+      cleanupResize?.();
     };
   }, []);
 
