@@ -151,6 +151,7 @@ export async function initParticles(scene: THREE.Scene) {
       uLightPosition: { value: new THREE.Vector2(centerX, centerY) },
       uLightIntensity: { value: 0.0 },
       uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      uLogoPulse: { value: 0.0 },
     },
     vertexShader,
     fragmentShader

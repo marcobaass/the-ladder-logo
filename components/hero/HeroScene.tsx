@@ -24,6 +24,11 @@ export default function HeroScene() {
     initParticles(scene).then((p) => {
       if (cancelled) return;
       particles = p;
+
+      // set the light position to the center of the screen if onMouseMove is not used
+      p.material.uniforms.uLightPosition.value.set(0, 0);
+      p.material.uniforms.uLightIntensity.value = 1.0;
+      
       cleanupScroll = initScroll(particles.material);
 
       const onMouseMove = (e: MouseEvent) => {
@@ -40,8 +45,8 @@ export default function HeroScene() {
         p.material.uniforms.uLightIntensity.value = Math.max(0, 1 - lightDist)
       }
 
-      window.addEventListener('mousemove', onMouseMove)
-      cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
+      // window.addEventListener('mousemove', onMouseMove)
+      // cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
       
       const onResize = () => {
         p.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
@@ -51,6 +56,12 @@ export default function HeroScene() {
 
       function animate(time: number = 0) {
         particles!.material.uniforms.uTime.value = time * 0.001;
+
+        // pulse the logo
+        const rawPulse = ((Math.sin(time * 0.0015)) +1) / 2
+        const easing = rawPulse * rawPulse * (3 -2 * rawPulse)
+        p.material.uniforms.uLogoPulse.value = easing;
+        
         renderer.render(scene, camera);
         frameId = requestAnimationFrame(animate);
       }

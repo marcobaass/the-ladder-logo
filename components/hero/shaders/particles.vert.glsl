@@ -9,6 +9,7 @@ uniform vec2 uModelCenter;
 uniform vec2 uLightPosition;
 uniform float uLightIntensity;
 uniform vec2 uResolution;
+uniform float uLogoPulse;
 
 attribute vec3 aStartPosition;
 attribute vec3 aTargetPosition;
@@ -83,7 +84,7 @@ void main() {
   float lightDist = (length(d2) - cornerRadius) / 0.5;
   float radiusBump = 1.6;
   float edgeBump = 0.3;
-  float bump = smoothstep(radiusBump, edgeBump, lightDist) * uLightIntensity * particleProgress;
+  float bump = smoothstep(radiusBump, edgeBump, lightDist) * uLightIntensity * particleProgress * uLogoPulse;
   
   // level of elevation ( bump )
   pos.z += bump * 2.5;
