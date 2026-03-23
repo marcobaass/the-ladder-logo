@@ -16,9 +16,11 @@ export function initScene(canvas: HTMLCanvasElement) {
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
-    alpha: true,
+    antialias: true
   });
+
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);

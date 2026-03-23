@@ -5,6 +5,10 @@ import { initScene } from "./scene";
 import { initParticles } from "./particles";
 import { initScroll } from "./scroll";
 import { SCROLL_MULTIPLIER } from "./scroll";
+import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
 export default function HeroScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -21,34 +25,61 @@ export default function HeroScene() {
     let particles: Awaited<ReturnType<typeof initParticles>> | undefined;
     let cancelled = false;
     const { scene, camera, renderer } = initScene(canvas);
+
+    
+    const composer = new EffectComposer(renderer);
+    
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    const bloomStrength = 0.35; // try 1.5 .. 2.0
+    const bloomRadius = 0.001;
+    const bloomThreshold = 0.8;
+    
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+      bloomStrength,
+      bloomRadius,
+      bloomThreshold
+    )
+    
+    composer.addPass(bloomPass);
+
     initParticles(scene).then((p) => {
       if (cancelled) return;
       particles = p;
 
       // set the light position to the center of the screen if onMouseMove is not used
       p.material.uniforms.uLightPosition.value.set(0, 0);
-      p.material.uniforms.uLightIntensity.value = 1.0;
+      p.material.uniforms.uLightIntensity.value = 0.9;
       
       cleanupScroll = initScroll(particles.material);
 
       const onMouseMove = (e: MouseEvent) => {
+        const aspect = window.innerWidth / window.innerHeight
+
         const nx = (e.clientX / window.innerWidth) * 2 - 1
         const ny = -(e.clientY / window.innerHeight) * 2 + 1
-        
-        // damp factor for constraining the light movement
-        const dampFactor = 0.75
-        const lightX = nx * dampFactor
-        const lightY = ny * dampFactor
+        // how far the light can nudge from the center (0 = never moves, 1 = full follow)
+        const dampFactor = 0.6
+        const lightX = (nx * dampFactor) / aspect
+        const lightY = (ny * dampFactor)
+        // only update position
         p.material.uniforms.uLightPosition.value.set(lightX, lightY)
-
-        const lightDist = Math.sqrt(nx * nx + ny * ny)
-        p.material.uniforms.uLightIntensity.value = Math.max(0, 1 - lightDist)
       }
 
-      // window.addEventListener('mousemove', onMouseMove)
-      // cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
+      window.addEventListener('mousemove', onMouseMove)
+      cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
       
       const onResize = () => {
+        const w = canvas.clientWidth
+        const h = canvas.clientHeight
+
+        renderer.setSize(w, h, false);
+        composer.setSize(w, h)
+
+        bloomPass.setSize(w, h)
+
         p.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
       }
       window.addEventListener('resize', onResize)
@@ -62,7 +93,7 @@ export default function HeroScene() {
         const easing = rawPulse * rawPulse * (3 -2 * rawPulse)
         p.material.uniforms.uLogoPulse.value = easing;
         
-        renderer.render(scene, camera);
+        composer.render();
         frameId = requestAnimationFrame(animate);
       }
       animate();
@@ -76,6 +107,8 @@ export default function HeroScene() {
       renderer.dispose();
       cleanupMouse?.();
       cleanupResize?.();
+      (bloomPass as any).dispose();
+      (composer as any).dispose();
     };
   }, []);
 

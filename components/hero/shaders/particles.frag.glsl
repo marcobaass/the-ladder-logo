@@ -14,7 +14,7 @@ void main() {
   float alpha = smoothstep(0.5, 0.4, d);
 
   // lightsource behind logo
-  float lightRadius = 1.9;
+  float lightRadius = 2.4;
   float t = 1.0 - smoothstep(0.0, lightRadius, vLightDist);
   t *= uLightIntensity;
   t = smoothstep(0.0, 1.0, t);

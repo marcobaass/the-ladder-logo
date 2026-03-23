@@ -156,6 +156,7 @@ export async function initParticles(scene: THREE.Scene) {
     vertexShader,
     fragmentShader
   })
+  material.toneMapped = false;
 
   const points = new THREE.Points(geometry, material)
 
