@@ -22,6 +22,35 @@ varying float vProgress;
 varying float vLightDist;
 varying float vBump;
 
+// Noise
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f); // smooth interpolation
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += a * noise2(p);
+    p = p * 2.0 + vec2(37.0, 17.0);
+    a *= 0.5;
+  }
+  return v; // 0..1
+}
+
+
+
 void main() {
   // 1. Calculate staggered progress for THIS particle
   float stagger = 0.3;
@@ -46,7 +75,7 @@ void main() {
   edgeFactor = clamp(edgeFactor, 0.0, 1.0);
   edgeFactor = pow(edgeFactor, 3.0);
 
-  targetPos.x += sin(uTime * 2.0 + targetPos.y * 4.0) * 0.06 * edgeFactor;
+  // targetPos.x += sin(uTime * 2.0 + targetPos.y * 4.0) * 0.06 * edgeFactor;
 
   // 4. Blend between wave and target
   vec3 pos = mix(wavePos, targetPos, particleProgress);
@@ -59,45 +88,20 @@ void main() {
   pos.x += cos(spiralAngle) * spiralRadius;
   pos.z += sin(spiralAngle) * spiralRadius;
 
-  // Bump: push particles toward camera based on light position
-  vec4 tempClip = projectionMatrix * viewMatrix * modelMatrix * vec4(pos, 1.0);
-  vec2 tempScreen = tempClip.xy / tempClip.w;
-  vec2 rawP = tempScreen - uLightPosition;
-  rawP.x *= uResolution.x / uResolution.y;
+  // Noise-driven logo breathing (independent of light source)
+  float logoMask = particleProgress * uLogoPulse;
 
-  // Square wobbly Bump
-  float cornerRadius = 0.00;
-  vec2 boxSize = vec2(0.05, 0.05);
+  // 4-6s breathing cycle: omega ~ 1.0..1.6 rad/s
+  float breath = 0.5 + 0.5 * sin(uTime * 1.2); // ~5.2s period
 
-  // first freq
-  boxSize.x += sin(uTime * 1.0 + rawP.y * 15.0) * 0.02;
-  boxSize.y += cos(uTime * 0.8 + rawP.x * 15.0) * 0.02;
+  // Low spatial frequency + slow drift
+  vec2 nUv = aTargetPosition.xy * 0.45 + vec2(uTime * 0.08, -uTime * 0.06);
+  float n = fbm(nUv);                  // 0..1
+  float nCentered = (n - 0.5) * 2.0;   // -1..1
 
-  // second layered freq
-  boxSize.x += sin(uTime * 1.0 + rawP.y * 15.0) * 0.008 + sin(uTime * 0.6 + rawP.y * 8.0) * 0.01;
-  boxSize.y += cos(uTime * 0.8 + rawP.x * 15.0) * 0.008 + cos(uTime * 0.9 + rawP.x * 8.0) * 0.01;
-
-  vec2 p = abs(rawP);
-
-
-  vec2 d2 = max(p - boxSize + cornerRadius, 0.0);
-  float lightDist = (length(d2) - cornerRadius) / 0.5;
-  float radiusBump = 1.6;
-  float edgeBump = 0.3;
-  float bump = smoothstep(radiusBump, edgeBump, lightDist) * uLightIntensity * particleProgress * uLogoPulse;
-  
-  // level of elevation ( bump )
-  pos.z += bump * 2.5;
-  // pos.z += bump * sin(uTime * 0.5);
-
-  float wrinkle = 0.0;
-
-  float adjustWrinkles = 0.5;
-  wrinkle += sin(rawP.x * 40.0 * adjustWrinkles + rawP.y * 20.0 + uTime * 1.5) * 0.15;
-  wrinkle += sin(rawP.y * 35.0 * adjustWrinkles - rawP.x * 15.0 + uTime * 1.2) * 0.12;
-  wrinkle += cos(rawP.x * 25.0 * adjustWrinkles + rawP.y * 30.0 - uTime * 0.8) * 0.08;
-  wrinkle += sin(rawP.x * 60.0 * adjustWrinkles - rawP.y * 45.0 + uTime * 2.0) * 0.04;
-  pos.z += bump * (wrinkle);
+  // Low amplitude
+  float bump = nCentered * 0.22 * breath * logoMask;
+  pos.z += bump * 3.0; // mutiplier for strength
 
   // transforming to screen coordinates
   vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
@@ -108,9 +112,10 @@ void main() {
   vEdgeFactor = edgeFactor;
   vProgress = particleProgress;
   vec2 screenPos = gl_Position.xy / gl_Position.w;
-  vLightDist = length(screenPos - uLightPosition) / 0.5;  
-  vBump = bump;
-  vLightDist = lightDist;
+  vec2 lightDelta = screenPos - uLightPosition;
+  lightDelta.x *= uResolution.x / uResolution.y; // aspect correction
+  vLightDist = length(lightDelta) / 0.5;
+  vBump = clamp(0.5 + 0.5 * nCentered * breath, 0.0, 1.0) * logoMask;
 
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
   float sizeFactor = mix(1.0, 0.6, particleProgress);
