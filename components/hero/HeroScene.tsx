@@ -32,8 +32,8 @@ export default function HeroScene() {
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
     
-    const bloomStrength = 0.35; // try 1.5 .. 2.0
-    const bloomRadius = 0.001;
+    const bloomStrength = 0.55; // try 1.5 .. 2.0
+    const bloomRadius = 0.1;
     const bloomThreshold = 0.8;
     
     const bloomPass = new UnrealBloomPass(
@@ -68,8 +68,8 @@ export default function HeroScene() {
         p.material.uniforms.uLightPosition.value.set(lightX, lightY)
       }
 
-      window.addEventListener('mousemove', onMouseMove)
-      cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
+      // window.addEventListener('mousemove', onMouseMove)
+      // cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
       
       const onResize = () => {
         const w = canvas.clientWidth
@@ -88,10 +88,37 @@ export default function HeroScene() {
       function animate(time: number = 0) {
         particles!.material.uniforms.uTime.value = time * 0.001;
 
+        const t = time * 0.001;
+        const omega = 1.2;
         // pulse the logo
-        const rawPulse = ((Math.sin(time * 0.0015)) +1) / 2
+        const rawPulse = (Math.sin(omega * t) + 1) * 0.5;
         const easing = rawPulse * rawPulse * (3 -2 * rawPulse)
         p.material.uniforms.uLogoPulse.value = easing;
+
+        // animate the light position
+        const angle = 145 * Math.PI / 180;
+        const dirX = Math.cos(angle);
+        const dirY = Math.sin(angle);
+        
+        const range = 1.0;
+        // same angular speed as shader breath: sin(uTime * 1.2)
+        const TAU = Math.PI * 2;
+        // phase where 0 means "noise just starts rising from minimum"
+        const barDelay = 0.5; // delay before light moves
+        let noisePhase = (omega * (t - barDelay) + Math.PI / 2) % TAU;
+        if (noisePhase < 0) noisePhase += TAU;
+        const cycle01 = ((noisePhase / TAU) * 0.5) % 1; // 0..1 over one noise cycle
+        // choose what fraction of the cycle the bar moves
+        const moveFrac = 0.45; // 45% movement, rest is pause
+        let phase = 1; // hold position during pause
+        if (cycle01 < moveFrac) {
+          const u = cycle01 / moveFrac; // 0..1 during active move
+          const raw = (Math.sin(u * Math.PI * 2.0 - Math.PI / 2) + 1) * 0.5;
+          const eased = raw * raw * (3 - 2 * raw);
+          phase = eased * 2 - 1;
+        }
+        const pos = -phase * range;
+        p.material.uniforms.uLightPosition.value.set(dirX * pos, dirY * pos);
         
         composer.render();
         frameId = requestAnimationFrame(animate);

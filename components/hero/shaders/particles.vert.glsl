@@ -111,10 +111,26 @@ void main() {
   // Varyings
   vEdgeFactor = edgeFactor;
   vProgress = particleProgress;
+
+  // Striplight
   vec2 screenPos = gl_Position.xy / gl_Position.w;
   vec2 lightDelta = screenPos - uLightPosition;
-  lightDelta.x *= uResolution.x / uResolution.y; // aspect correction
-  vLightDist = length(lightDelta) / 0.5;
+  lightDelta.x *= uResolution.x / uResolution.y;
+
+  // rotate light space
+  float degrees = 145.0;
+  float angle = degrees * 3.14159265 / 180.0;
+  float c = cos(angle);
+  float s = sin(angle);
+  vec2 rotatedDelta = vec2(
+    c * lightDelta.x - s * lightDelta.y,
+    s * lightDelta.x + c * lightDelta.y
+  );
+
+  // strip centered at uLightPosition.y, narrow in Y, long in X
+  float halfThickness = 0.32; // strip thickness
+  vLightDist = abs(rotatedDelta.y) / halfThickness;
+
   vBump = clamp(0.5 + 0.5 * nCentered * breath, 0.0, 1.0) * logoMask;
 
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
