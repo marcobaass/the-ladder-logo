@@ -2,13 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { initScene } from "./scene";
-import { initParticles } from "./particles";
+import { initParticles, PARTICLES_BASE_ROT_X } from "./particles";
 import { initScroll } from "./scroll";
 import { SCROLL_MULTIPLIER } from "./scroll";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { initTilt, computeTiltFromMouse } from "../tilt";
 
 export default function HeroScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,34 +47,30 @@ export default function HeroScene() {
     composer.addPass(bloomPass);
 
     initParticles(scene).then((p) => {
-      if (cancelled) return;
+      if (cancelled || !canvas) return;
+      const canvasEl = canvas;
       particles = p;
+
+      let curPitchDelta = 0;
+      let curRotY = 0;
+      const ROTATION_SMOOTH = 0.04;
+      const MAX_TILT_YAW = 0.18;
+      const MAX_TILT_PITCH_UPPER = 0.25;
+      const MAX_TILT_PITCH_LOWER = 0.38;
+      
+      const tilt = initTilt(canvasEl);
+      cleanupMouse = tilt.cleanup;
+
 
       // set the light position to the center of the screen if onMouseMove is not used
       p.material.uniforms.uLightPosition.value.set(0, 0);
       p.material.uniforms.uLightIntensity.value = 0.9;
       
       cleanupScroll = initScroll(particles.material);
-
-      const onMouseMove = (e: MouseEvent) => {
-        const aspect = window.innerWidth / window.innerHeight
-
-        const nx = (e.clientX / window.innerWidth) * 2 - 1
-        const ny = -(e.clientY / window.innerHeight) * 2 + 1
-        // how far the light can nudge from the center (0 = never moves, 1 = full follow)
-        const dampFactor = 0.6
-        const lightX = (nx * dampFactor) / aspect
-        const lightY = (ny * dampFactor)
-        // only update position
-        p.material.uniforms.uLightPosition.value.set(lightX, lightY)
-      }
-
-      // window.addEventListener('mousemove', onMouseMove)
-      // cleanupMouse = () => window.removeEventListener('mousemove', onMouseMove)
       
       const onResize = () => {
-        const w = canvas.clientWidth
-        const h = canvas.clientHeight
+        const w = canvasEl.clientWidth
+        const h = canvasEl.clientHeight
 
         renderer.setSize(w, h, false);
         composer.setSize(w, h)
@@ -87,6 +84,23 @@ export default function HeroScene() {
 
       function animate(time: number = 0) {
         particles!.material.uniforms.uTime.value = time * 0.001;
+        const progress = particles!.material.uniforms.uProgress.value as number;
+
+        const { targetRotationY, targetPitchDelta } = computeTiltFromMouse(
+          tilt.state.nx,
+          tilt.state.ny,
+          progress,
+          MAX_TILT_YAW,
+          MAX_TILT_PITCH_UPPER,
+          MAX_TILT_PITCH_LOWER
+        );
+
+        curRotY += (targetRotationY - curRotY) * ROTATION_SMOOTH;
+        curPitchDelta += (targetPitchDelta - curPitchDelta) * ROTATION_SMOOTH;
+
+        p.tiltOrient.rotation.set(curPitchDelta, curRotY, 0, "YXZ");
+        p.points.rotation.x = PARTICLES_BASE_ROT_X;
+        p.points.rotation.y = 0;
 
         const t = time * 0.001;
         const omega = 1.2;

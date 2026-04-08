@@ -7,6 +7,9 @@ import fragmentShader from './shaders/particles.frag.glsl'
 const GRID_SIZE = 79
 const COUNT = GRID_SIZE * GRID_SIZE
 
+/** Static camera-facing tilt; mouse tilt is applied on `tiltPivot`. */
+export const PARTICLES_BASE_ROT_X = -Math.PI * 0.075
+
 export async function initParticles(scene: THREE.Scene) {
   const geometry = new THREE.BufferGeometry()
   
@@ -46,7 +49,9 @@ export async function initParticles(scene: THREE.Scene) {
 
   const img = new Image()
   img.src = '/model/the-ladder.png'
-  await new Promise(resolve => { img.onload = () => resolve() })
+  await new Promise<void>(resolve => {
+    img.onload = () => resolve()
+  })
 
   const canvas = document.createElement('canvas')
   canvas.width = img.width
@@ -134,6 +139,9 @@ export async function initParticles(scene: THREE.Scene) {
   geometry.setAttribute('aRandom', new THREE.BufferAttribute(random, 1))
   geometry.setAttribute('aIndex', new THREE.BufferAttribute(index, 1))
 
+  const uTargetScale = 0.35
+  const uTargetOffset = new THREE.Vector3(0, -5, 0)
+
   const material = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -143,8 +151,8 @@ export async function initParticles(scene: THREE.Scene) {
       uTime: { value: 0 },
       uProgress: { value: 0 },
       uSize: { value: 60 },
-      uTargetScale: { value: 0.35 },
-      uTargetOffset: { value: new THREE.Vector3(0, -5, 0) }, // offset for the ladder
+      uTargetScale: { value: uTargetScale },
+      uTargetOffset: { value: uTargetOffset.clone() }, // offset for the ladder
       uKeepRatio: { value: usableCount / COUNT },
       uEdgeRadius: { value: maxRadius },
       uModelCenter: { value: new THREE.Vector3(centerX, centerY) },
@@ -163,11 +171,29 @@ export async function initParticles(scene: THREE.Scene) {
   // Force update
   points.frustumCulled = false // Disable frustum culling
 
-  points.rotation.x = -Math.PI * 0.15
-  points.position.y = 5
-  points.position.z = 10
+  // Centroid of morphed logo in buffer space (same as shader: aTarget * scale + offset)
+  const logoCentroidLocal = new THREE.Vector3(
+    centerX * uTargetScale + uTargetOffset.x,
+    centerY * uTargetScale + uTargetOffset.y,
+    uTargetOffset.z
+  )
+  const baseEuler = new THREE.Euler(PARTICLES_BASE_ROT_X, 0, 0)
+  // R*C: rotated centroid in parent space. Child offset -R*C puts centroid at pivot origin for mouse tilt.
+  // Pivot must be (0,6,10) + R*C — not (0,6,10) — because the old mesh *origin* was at (0,6,10), not the logo centroid.
+  const rotCentroid = logoCentroidLocal.clone().applyEuler(baseEuler)
+  points.position.copy(rotCentroid).negate()
 
-  scene.add(points)
+  points.rotation.x = PARTICLES_BASE_ROT_X
 
-  return { points, material, geometry, centerX, centerY, maxRadius }
+  const tiltPivot = new THREE.Group()
+  tiltPivot.position.set(0, 6, 10).add(rotCentroid)
+
+  // Single orientation node: YXZ matches yaw-then-local-pitch (same as nested yaw×pitch).
+  const tiltOrient = new THREE.Group()
+  tiltPivot.add(tiltOrient)
+  tiltOrient.add(points)
+
+  scene.add(tiltPivot)
+
+  return { points, tiltPivot, tiltOrient, material, geometry, centerX, centerY, maxRadius }
 }

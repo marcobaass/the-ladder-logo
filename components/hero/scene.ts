@@ -12,7 +12,7 @@ export function initScene(canvas: HTMLCanvasElement) {
   );
 
   camera.position.set(0, 5, 18);
-  camera.lookAt(0, -3, 0);
+  camera.lookAt(0, 0, 0);
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
