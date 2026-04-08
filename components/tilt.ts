@@ -1,6 +1,5 @@
 import * as THREE from "three";
 
-/** Normalized pointer in canvas space: -1..1 from left→right and top→bottom. */
 export type TiltState = { nx: number; ny: number };
 
 export function initTilt(canvas: HTMLCanvasElement) {
@@ -10,7 +9,7 @@ export function initTilt(canvas: HTMLCanvasElement) {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     if (w <= 0 || h <= 0) return;
-    // offsetX/offsetY are in canvas layout space (avoids client vs getBoundingClientRect drift).
+
     state.nx = THREE.MathUtils.clamp((e.offsetX / w) * 2 - 1, -1, 1);
     state.ny = THREE.MathUtils.clamp((e.offsetY / h) * 2 - 1, -1, 1);
   };
@@ -30,13 +29,17 @@ export function computeTiltFromMouse(
   maxYaw = 0.18,
   /** ny < 0 (pointer in upper half of canvas) */
   maxPitchNegNy = 0.22,
-  /** ny > 0 (lower half) — slightly higher; downward tilt often reads weaker than upward */
+  /** ny > 0 (pointer in lower half of canvas) */
   maxPitchPosNy = 0.38
 ) {
-  const pitchBlend = THREE.MathUtils.smoothstep(progress, 0.82, 0.98);
+    const pitchBlend = THREE.MathUtils.smoothstep(progress, 0.82, 0.98);
   const pitchMax = ny < 0 ? maxPitchNegNy : maxPitchPosNy;
+  // Yaw is reduced during early wave, returns to full by logo.
+  const earlyYawGain = 0.6; // lower = less wave yaw
+  const yawToLogoBlend = THREE.MathUtils.smoothstep(progress, 0.35, 0.85);
+  const yawGain = THREE.MathUtils.lerp(earlyYawGain, 1.0, yawToLogoBlend);
   return {
-    targetRotationY: nx * maxYaw,
+    targetRotationY: nx * maxYaw * yawGain,
     targetPitchDelta: ny * pitchMax * pitchBlend,
   };
 }

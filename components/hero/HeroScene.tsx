@@ -54,9 +54,9 @@ export default function HeroScene() {
       let curPitchDelta = 0;
       let curRotY = 0;
       const ROTATION_SMOOTH = 0.04;
-      const MAX_TILT_YAW = 0.18;
+      const MAX_TILT_YAW = 0.25;
       const MAX_TILT_PITCH_UPPER = 0.25;
-      const MAX_TILT_PITCH_LOWER = 0.38;
+      const MAX_TILT_PITCH_LOWER = 0.40;
       
       const tilt = initTilt(canvasEl);
       cleanupMouse = tilt.cleanup;
