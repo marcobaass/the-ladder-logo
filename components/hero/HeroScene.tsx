@@ -53,7 +53,7 @@ export default function HeroScene() {
 
       let curPitchDelta = 0;
       let curRotY = 0;
-      const ROTATION_SMOOTH = 0.04;
+      const ROTATION_SMOOTH = 0.5;
       const MAX_TILT_YAW = 0.25;
       const MAX_TILT_PITCH_UPPER = 0.25;
       const MAX_TILT_PITCH_LOWER = 0.40;

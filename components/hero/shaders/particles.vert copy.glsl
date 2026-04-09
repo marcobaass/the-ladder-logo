@@ -22,6 +22,33 @@ varying float vProgress;
 varying float vLightDist;
 varying float vBump;
 
+// Noise
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f); // smooth interpolation
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int i = 0; i < 4; i++) {
+    v += a * noise2(p);
+    p = p * 2.0 + vec2(37.0, 17.0);
+    a *= 0.5;
+  }
+  return v; // 0..1
+}
+
 
 
 void main() {
@@ -61,43 +88,20 @@ void main() {
   pos.x += cos(spiralAngle) * spiralRadius;
   pos.z += sin(spiralAngle) * spiralRadius;
 
+  // Noise-driven logo breathing (independent of light source)
+  float logoMask = particleProgress * uLogoPulse;
 
+  // 4-6s breathing cycle: omega ~ 1.0..1.6 rad/s
+  float breath = 0.5 + 0.5 * sin(uTime * 1.2); // ~5.2s period
 
+  // Low spatial frequency + slow drift
+  vec2 nUv = aTargetPosition.xy * 0.45 + vec2(uTime * 0.08, -uTime * 0.06);
+  float n = fbm(nUv);                  // 0..1
+  float nCentered = (n - 0.5) * 2.0;   // -1..1
 
-  // 
-  // Logo Wave
-  //
-
-  // progress gate
-  float logoMask = smoothstep(0.85, 1.0, particleProgress);
-
-  // bounds in rendered logo space (same space as targetPos/pos)
-  float leftX  = (uModelCenter.x - uEdgeRadius) * uTargetScale + uTargetOffset.x;
-  float rightX = (uModelCenter.x + uEdgeRadius) * uTargetScale + uTargetOffset.x;
-
-  // cycle: move then pause
-  float speed = 0.22;
-  float cycle = fract(uTime * speed);
-  float moveFrac = 0.75;
-  float line = 0.0;
-
-  if (cycle < moveFrac) {
-    float u = cycle / moveFrac;
-    float eased = u * u * (3.0 - 2.0 * u);
-
-    // LEFT -> RIGHT
-    float centerX = mix(leftX, rightX, eased);
-
-    // use pos.x (render space), not aTargetPosition.x
-    float waveHalfThickness = 0.5; // width of the wave
-    float stripDist = abs(pos.x - centerX) / waveHalfThickness;
-    line = 1.0 - smoothstep(0.0, 1.0, stripDist);
-  }
-
-  float waveBump = 0.5; // height of the wave
-  pos.z += line * waveBump * logoMask;
-  vBump = line * logoMask;
-
+  // Low amplitude
+  float bump = nCentered * 0.22 * breath * logoMask;
+  pos.z += bump * 3.0; // mutiplier for strength
 
   // transforming to screen coordinates
   vec4 modelPosition = modelMatrix * vec4(pos, 1.0);
@@ -126,6 +130,8 @@ void main() {
   // strip centered at uLightPosition.y, narrow in Y, long in X
   float halfThickness = 0.32; // strip thickness
   vLightDist = abs(rotatedDelta.y) / halfThickness;
+
+  vBump = clamp(0.5 + 0.5 * nCentered * breath, 0.0, 1.0) * logoMask;
 
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
   float sizeFactor = mix(1.0, 0.6, particleProgress);
