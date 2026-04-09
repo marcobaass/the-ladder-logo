@@ -71,7 +71,32 @@ void main() {
   // progress gate
   float logoMask = smoothstep(0.85, 1.0, particleProgress);
 
-  
+  // bounds in rendered logo space (same space as targetPos/pos)
+  float leftX  = (uModelCenter.x - uEdgeRadius) * uTargetScale + uTargetOffset.x;
+  float rightX = (uModelCenter.x + uEdgeRadius) * uTargetScale + uTargetOffset.x;
+
+  // cycle: move then pause
+  float speed = 0.22;
+  float cycle = fract(uTime * speed);
+  float moveFrac = 0.75;
+  float line = 0.0;
+
+  if (cycle < moveFrac) {
+    float u = cycle / moveFrac;
+    float eased = u * u * (3.0 - 2.0 * u);
+
+    // LEFT -> RIGHT
+    float centerX = mix(leftX, rightX, eased);
+
+    // use pos.x (render space), not aTargetPosition.x
+    float waveHalfThickness = 0.5; // width of the wave
+    float stripDist = abs(pos.x - centerX) / waveHalfThickness;
+    line = 1.0 - smoothstep(0.0, 1.0, stripDist);
+  }
+
+  float waveBump = 0.5; // height of the wave
+  pos.z += line * waveBump * logoMask;
+  vBump = line * logoMask;
 
 
   // transforming to screen coordinates
@@ -97,6 +122,10 @@ void main() {
     c * lightDelta.x - s * lightDelta.y,
     s * lightDelta.x + c * lightDelta.y
   );
+
+  // strip centered at uLightPosition.y, narrow in Y, long in X
+  float halfThickness = 0.32; // strip thickness
+  vLightDist = abs(rotatedDelta.y) / halfThickness;
 
   // shrinking pixels on progress (initalsize, shrinkvalue, particleprogress)
   float sizeFactor = mix(1.0, 0.6, particleProgress);

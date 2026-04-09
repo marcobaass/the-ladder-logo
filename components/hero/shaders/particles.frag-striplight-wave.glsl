@@ -23,9 +23,6 @@ void main() {
   float lightGate = smoothstep(0.85, 1.0, vProgress);
   t *= lightGate;
 
-  float radius = clamp(vEdgeFactor, 0.0, 1.0);
-  float c = 1.0 -radius;
-
   vec3 c_cinnabar = vec3(0.9137, 0.3255, 0.2078); // #E95335
   vec3 c_deepMid  = vec3(0.7529, 0.2235, 0.1686); // #C0392B
   vec3 c_deepDark = vec3(0.5451, 0.1451, 0.0000); // #8B2500
@@ -33,14 +30,20 @@ void main() {
   vec3 c_gold     = vec3(1.0000, 0.8431, 0.0000); // #FFD700
   vec3 c_pale     = vec3(1.0000, 0.9608, 0.8784); // #FFF5E0
 
-  // White center only
-  float wWhite  = smoothstep(0.78, 1.00, c);
-  float wOrange = smoothstep(0.43, 0.67, c) * (1.0 - smoothstep(0.75, 0.89, c));
-  // Compose on dark base
+  // Piecewise: far/deep -> mid -> hot -> gold -> pale at closest
   vec3 color = c_deepDark;
-  color = mix(color, c_orange, wOrange);
-  color = mix(color, c_pale,   wWhite);
-  // optional transition tint
+
+  // Far: deepen up to mid red
+  color = mix(color, c_deepMid, smoothstep(0.00, 0.35, t));
+
+  // Mid: cinnabar -> hot orange
+  color = mix(color, c_cinnabar, smoothstep(0.25, 0.55, t));
+  color = mix(color, c_orange,   smoothstep(0.50, 0.75, t));
+
+  // Hot core: orange -> gold -> pale
+  color = mix(color, c_gold, smoothstep(0.70, 0.90, t));
+  color = mix(color, c_pale, smoothstep(0.85, 1.00, t));
+
   vec3 waveColor = c_cinnabar;
   color = mix(waveColor, color, vProgress);
 
