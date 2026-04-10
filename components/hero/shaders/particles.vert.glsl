@@ -44,9 +44,21 @@ void main() {
   // 3. Get target position
   vec3 targetPos = aTargetPosition * uTargetScale + uTargetOffset;
 
-  float edgeFactor = length(aTargetPosition.xy - uModelCenter) / uEdgeRadius;
-  edgeFactor = clamp(edgeFactor, 0.0, 1.0);
-  edgeFactor = pow(edgeFactor, 3.0);
+  // Logo Edge Glow
+  vec2 logoDelta = aTargetPosition.xy - uModelCenter;
+  float rLinear = length(logoDelta) / uEdgeRadius;
+  rLinear = clamp(rLinear, 0.0, 1.0);
+  float theta = atan(logoDelta.y, logoDelta.x);
+  // Center glow: breathe + gentle angular wobble (per particle, logo space)
+  float breathe = 0.25 * sin(uTime * 0.5);
+  
+  float wobble =
+      0.45 * sin(theta * 2.0 + uTime * 1.05)
+    + 0.28 * sin(theta * -2.0 + uTime * 0.88)
+    + 0.18 * sin(theta * 3.0 + uTime * 1.4);
+  float rWarped = rLinear * (1.0 + breathe + wobble);
+  rWarped = clamp(rWarped, 0.0, 1.0);
+  float edgeFactor = pow(rWarped, 2.0);
 
   // targetPos.x += sin(uTime * 2.0 + targetPos.y * 4.0) * 0.06 * edgeFactor;
 
@@ -69,9 +81,7 @@ void main() {
   //
 
   // progress gate
-  float logoMask = smoothstep(0.85, 1.0, particleProgress);
-
-  
+  float logoMask = smoothstep(0.85, 1.0, particleProgress); 
 
 
   // transforming to screen coordinates

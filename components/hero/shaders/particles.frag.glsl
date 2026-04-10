@@ -33,8 +33,8 @@ void main() {
   vec3 c_gold     = vec3(1.0000, 0.8431, 0.0000); // #FFD700
   vec3 c_pale     = vec3(1.0000, 0.9608, 0.8784); // #FFF5E0
 
- 
-  float circleColor = smoothstep(0.85, 1.0, radius);
+ // (outer, inner, radius)
+  float circleColor = smoothstep(0.65, 1.0, radius);
   // Compose on dark base
   vec3 color = c_deepDark;
 
