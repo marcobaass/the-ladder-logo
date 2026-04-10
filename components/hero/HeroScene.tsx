@@ -33,9 +33,9 @@ export default function HeroScene() {
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
     
-    const bloomStrength = 0.55; // try 1.5 .. 2.0
-    const bloomRadius = 0.1;
-    const bloomThreshold = 0.8;
+    const bloomStrength = 0.75; // try 1.5 .. 2.0
+    const bloomRadius = 1.25;
+    const bloomThreshold = 0.5;
     
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),

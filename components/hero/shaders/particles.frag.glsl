@@ -24,7 +24,7 @@ void main() {
   t *= lightGate;
 
   float radius = clamp(vEdgeFactor, 0.0, 1.0);
-  float c = 1.0 -radius;
+  radius = 1.0 -radius;
 
   vec3 c_cinnabar = vec3(0.9137, 0.3255, 0.2078); // #E95335
   vec3 c_deepMid  = vec3(0.7529, 0.2235, 0.1686); // #C0392B
@@ -33,14 +33,15 @@ void main() {
   vec3 c_gold     = vec3(1.0000, 0.8431, 0.0000); // #FFD700
   vec3 c_pale     = vec3(1.0000, 0.9608, 0.8784); // #FFF5E0
 
-  // White center only
-  float wWhite  = smoothstep(0.78, 1.00, c);
-  float wOrange = smoothstep(0.43, 0.67, c) * (1.0 - smoothstep(0.75, 0.89, c));
+ 
+  float circleColor = smoothstep(0.85, 1.0, radius);
   // Compose on dark base
   vec3 color = c_deepDark;
-  color = mix(color, c_orange, wOrange);
-  color = mix(color, c_pale,   wWhite);
-  // optional transition tint
+
+  // middle value color of circle
+  color = mix(color, c_orange, circleColor);
+
+  // wave color
   vec3 waveColor = c_cinnabar;
   color = mix(waveColor, color, vProgress);
 
