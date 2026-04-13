@@ -10,15 +10,20 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { initTilt, computeTiltFromMouse } from "../tilt";
+import { AuroraBackdrop } from "./AuroraBackdrop";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+
+const BLOOM_LAYER = 1;
+const bloomLayer = new THREE.Layers();
+bloomLayer.set(BLOOM_LAYER);
 
 export default function HeroScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  
+    
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let frameId: number;
+    let frameId: number = 0;
     let cleanupScroll: (() => void) | undefined;
     let cleanupMouse: (() => void) | undefined;
     let cleanupResize: (() => void) | undefined;
@@ -27,33 +32,101 @@ export default function HeroScene() {
     let cancelled = false;
     const { scene, camera, renderer } = initScene(canvas);
 
+    const materials: Record<string, THREE.Material | THREE.Material[]> = {};
+
+    const darkMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
     
-    const composer = new EffectComposer(renderer);
+    function darkenNonBloomed(obj: THREE.Object3D) {
+      if (bloomLayer.test(obj.layers)) return;
     
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
+      if (
+        obj instanceof THREE.Mesh ||
+        obj instanceof THREE.Points ||
+        obj instanceof THREE.Line ||
+        obj instanceof THREE.LineSegments
+      ) {
+        const mat = obj.material;
+        if (!mat) return;
+        if (Array.isArray(mat)) {
+          materials[obj.uuid] = mat;
+          obj.material = mat.map(() => darkMaterial);
+        } else {
+          materials[obj.uuid] = mat;
+          obj.material = darkMaterial;
+        }
+      }
+    }
     
-    const bloomStrength = 0.75; // try 1.5 .. 2.0
-    const bloomRadius = 1.25;
-    const bloomThreshold = 0.5;
+    function restoreMaterial(obj: THREE.Object3D) {
+      const stored = materials[obj.uuid];
+      if (!stored) return;
+      obj.material = stored;
+      delete materials[obj.uuid];
+    }
+    
+    const bloomComposer = new EffectComposer(renderer);
+    bloomComposer.renderToScreen = false;
+    
+    const bloomRenderPass = new RenderPass(scene, camera);
+    bloomRenderPass.clear = true;
+    bloomRenderPass.clearAlpha = 0;
+    bloomComposer.addPass(bloomRenderPass);
     
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-      bloomStrength,
-      bloomRadius,
-      bloomThreshold
-    )
+      0.75, // strength
+      1.25, // radius
+      0.5 // threshold
+    );
+    bloomComposer.addPass(bloomPass);
     
-    composer.addPass(bloomPass);
+    const finalComposer = new EffectComposer(renderer);
+    
+    const finalRenderPass = new RenderPass(scene, camera);
+    finalRenderPass.clear = true;
+    finalRenderPass.clearAlpha = 0;
+    finalComposer.addPass(finalRenderPass);
+    
+    const combineMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null },
+        bloomTexture: { value: null },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse;
+        uniform sampler2D bloomTexture;
+        varying vec2 vUv;
+        void main() {
+          vec4 base = texture2D(tDiffuse, vUv);
+          vec4 bloom = texture2D(bloomTexture, vUv);
+          gl_FragColor = vec4(base.rgb + bloom.rgb, base.a);
+        }
+      `,
+    });
+    
+    const combinePass = new ShaderPass(combineMaterial);
+    finalComposer.addPass(combinePass);
 
     initParticles(scene).then((p) => {
       if (cancelled || !canvas) return;
       const canvasEl = canvas;
       particles = p;
+      p.points.layers.enable(BLOOM_LAYER);
 
       let curPitchDelta = 0;
       let curRotY = 0;
-      const ROTATION_SMOOTH = 0.5;
       const MAX_TILT_YAW = 0.25;
       const MAX_TILT_PITCH_UPPER = 0.25;
       const MAX_TILT_PITCH_LOWER = 0.40;
@@ -69,16 +142,20 @@ export default function HeroScene() {
       cleanupScroll = initScroll(particles.material);
       
       const onResize = () => {
-        const w = canvasEl.clientWidth
-        const h = canvasEl.clientHeight
-
+        const w = canvasEl.clientWidth;
+        const h = canvasEl.clientHeight;
+      
         renderer.setSize(w, h, false);
-        composer.setSize(w, h)
+        bloomComposer.setSize(w, h);
+        finalComposer.setSize(w, h);
+        bloomPass.setSize(w, h);
+      
+        p.material.uniforms.uResolution.value.set(
+          window.innerWidth,
+          window.innerHeight
+        );
+      };
 
-        bloomPass.setSize(w, h)
-
-        p.material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight)
-      }
       window.addEventListener('resize', onResize)
       cleanupResize = () => window.removeEventListener('resize', onResize)
 
@@ -138,7 +215,15 @@ export default function HeroScene() {
         const pos = -phase * range;
         p.material.uniforms.uLightPosition.value.set(dirX * pos, dirY * pos);
         
-        composer.render();
+        scene.traverse(darkenNonBloomed);
+        bloomComposer.render();
+        scene.traverse(restoreMaterial);
+
+        combineMaterial.uniforms.bloomTexture.value =
+          bloomComposer.readBuffer.texture;
+
+        finalComposer.render();
+
         frameId = requestAnimationFrame(animate);
       }
       animate();
@@ -152,15 +237,19 @@ export default function HeroScene() {
       renderer.dispose();
       cleanupMouse?.();
       cleanupResize?.();
-      (bloomPass as any).dispose();
-      (composer as any).dispose();
+      darkMaterial.dispose();
+      combineMaterial.dispose();
+      bloomPass.dispose();
+      bloomComposer.dispose();
+      finalComposer.dispose();
     };
   }, []);
 
   return (
     <div style={{ height: `${100 + SCROLL_MULTIPLIER * 100}vh` }}>
-      <section className="sticky top-0 h-screen w-full">
-        <canvas ref={canvasRef} className="block absolute inset-0 h-full w-full" />
+      <section className="sticky top-0 h-screen w-full overflow-hidden">
+        <AuroraBackdrop />
+        <canvas ref={canvasRef} className="absolute inset-0 z-10 block h-full w-full" />
       </section>
     </div>
   );

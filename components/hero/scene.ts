@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 export function initScene(canvas: HTMLCanvasElement) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
+  scene.background = null;
 
   const camera = new THREE.PerspectiveCamera(
     45,
@@ -16,8 +16,10 @@ export function initScene(canvas: HTMLCanvasElement) {
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true
+    antialias: true,
+    alpha: true,
   });
+  renderer.setClearAlpha(0);
 
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
