@@ -65,7 +65,14 @@ export default function HeroScene() {
     function restoreMaterial(obj: THREE.Object3D) {
       const stored = materials[obj.uuid];
       if (!stored) return;
-      obj.material = stored;
+      if (
+        obj instanceof THREE.Mesh ||
+        obj instanceof THREE.Points ||
+        obj instanceof THREE.Line ||
+        obj instanceof THREE.LineSegments
+      ) {
+        obj.material = stored;
+      }
       delete materials[obj.uuid];
     }
     
@@ -79,7 +86,7 @@ export default function HeroScene() {
     
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
-      0.75, // strength
+      0.5, // strength
       1.25, // radius
       0.5 // threshold
     );
@@ -110,8 +117,11 @@ export default function HeroScene() {
         varying vec2 vUv;
         void main() {
           vec4 base = texture2D(tDiffuse, vUv);
-          vec4 bloom = texture2D(bloomTexture, vUv);
-          gl_FragColor = vec4(base.rgb + bloom.rgb, base.a);
+          vec4 bloomed = texture2D(bloomTexture, vUv);
+          // UnrealBloomPass output is already (scene + bloom), same as the old
+          // single-composer chain. Do not add base.rgb again or particle color
+          // is doubled and reads pale/washed. Keep base alpha for CSS backdrop.
+          gl_FragColor = vec4(bloomed.rgb, base.a);
         }
       `,
     });
