@@ -35,7 +35,7 @@ export function computeTiltFromMouse(
     const pitchBlend = THREE.MathUtils.smoothstep(progress, 0.82, 0.98);
   const pitchMax = ny < 0 ? maxPitchNegNy : maxPitchPosNy;
   // Yaw is reduced during early wave, returns to full by logo.
-  const earlyYawGain = 0.6; // lower = less wave yaw
+  const earlyYawGain = 0.4; // lower = less wave yaw
   const yawToLogoBlend = THREE.MathUtils.smoothstep(progress, 0.35, 0.85);
   const yawGain = THREE.MathUtils.lerp(earlyYawGain, 1.0, yawToLogoBlend);
   return {

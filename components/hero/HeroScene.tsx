@@ -95,8 +95,12 @@ export default function HeroScene() {
           MAX_TILT_PITCH_LOWER
         );
 
-        curRotY += (targetRotationY - curRotY) * ROTATION_SMOOTH;
-        curPitchDelta += (targetPitchDelta - curPitchDelta) * ROTATION_SMOOTH;
+        const SMOOTH_WAVE = 0.03;
+        const SMOOTH_LOGO = 0.5;
+        const progressBlend = THREE.MathUtils.smoothstep(progress, 0.35, 0.88);
+        const rotationSmooth = THREE.MathUtils.lerp(SMOOTH_WAVE, SMOOTH_LOGO, progressBlend);
+        curRotY += (targetRotationY - curRotY) * rotationSmooth;
+        curPitchDelta += (targetPitchDelta - curPitchDelta) * rotationSmooth;
 
         p.tiltOrient.rotation.set(curPitchDelta, curRotY, 0, "YXZ");
         p.points.rotation.x = PARTICLES_BASE_ROT_X;
