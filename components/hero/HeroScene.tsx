@@ -258,7 +258,19 @@ export default function HeroScene() {
   return (
     <div style={{ height: `${100 + SCROLL_MULTIPLIER * 100}vh` }}>
       <section className="sticky top-0 h-screen w-full overflow-hidden">
-        <AuroraBackdrop />
+        {/* <AuroraBackdrop /> */}
+        
+        <video
+          className="absolute inset-0 z-0 h-full w-full object-cover pointer-events-none"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+        >
+          <source src="/videos/flameBackdrop.mp4" type="video/mp4" />
+        </video>
+
         <canvas ref={canvasRef} className="absolute inset-0 z-10 block h-full w-full" />
       </section>
     </div>
