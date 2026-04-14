@@ -68,8 +68,11 @@ void main() {
   // Spiral progress
   float spiralProgress = smoothstep(0.9, 1.0, particleProgress);
   float spiralEnvelope = sin(spiralProgress * 3.14159);
-  float spiralAngle = spiralProgress * 6.28 * 1.0;
-  float spiralRadius = 1.0 * spiralEnvelope;
+  // Add per-particle variation so the swirl does not collapse into rows/lines.
+  float spiralTurns = mix(0.85, 1.25, aRandom);
+  float spiralPhase = (aRandom - 0.5) * 1.8;
+  float spiralAngle = spiralProgress * 6.28 * spiralTurns + spiralPhase;
+  float spiralRadius = mix(0.75, 1.15, aRandom) * spiralEnvelope;
   pos.x += cos(spiralAngle) * spiralRadius;
   pos.z += sin(spiralAngle) * spiralRadius;
 

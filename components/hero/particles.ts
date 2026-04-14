@@ -105,24 +105,40 @@ export async function initParticles(scene: THREE.Scene) {
   }
   modelPoints.length = COUNT
 
+  // Logo fill order: strict bottom-to-top rows.
   modelPoints.sort((a, b) => {
     const aZero = a.z === -999 ? 1 : 0
     const bZero = b.z === -999 ? 1 : 0
-    if (aZero !== bZero) return aZero - bZero
-    return a.y - b.y
+    if (aZero !== bZero) return aZero - bZero // real logo points first
+    if (a.y !== b.y) return a.y - b.y
+    const aCenterDist = Math.abs(a.x - centerX)
+    const bCenterDist = Math.abs(b.x - centerX)
+    if (aCenterDist !== bCenterDist) return aCenterDist - bCenterDist
+    return a.x - b.x
   })
 
-  const waveYPositions: { idx: number; waveY: number }[] = []
-  for (let i = 0; i < COUNT; i++) {
-    waveYPositions.push({
-      idx: i,
-      waveY: start[i * 3 + 1]
+  // Wave pickup order: strict row-by-row in generation order.
+  // With idx = i * GRID_SIZE + j, row is j and column is i.
+  const waveRowPositions: { idx: number; row: number; col: number }[] = []
+  for (let idx = 0; idx < COUNT; idx++) {
+    waveRowPositions.push({
+      idx,
+      row: idx % GRID_SIZE,
+      col: Math.floor(idx / GRID_SIZE),
     })
   }
-  waveYPositions.sort((a, b) => a.waveY - b.waveY)
+  // Break strand-like motion: keep row order, but decorrelate pickup inside each row.
+  // Fill timing still comes from orderedTargets via `index`, so center-first logo build remains.
+  waveRowPositions.sort((a, b) => {
+    if (a.row !== b.row) return a.row - b.row
+    const aRand = random[a.idx]
+    const bRand = random[b.idx]
+    if (aRand !== bRand) return aRand - bRand
+    return a.col - b.col
+  })
 
   for (let i = 0; i < COUNT; i++) {
-    const particleIdx = waveYPositions[i].idx
+    const particleIdx = waveRowPositions[i].idx
     const i3 = particleIdx * 3
 
     target[i3 + 0] = modelPoints[i].x
