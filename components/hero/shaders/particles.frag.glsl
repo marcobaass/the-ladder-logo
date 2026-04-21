@@ -30,16 +30,18 @@ void main() {
   vec3 c_deepMid  = vec3(0.7529, 0.2235, 0.1686); // #C0392B
   vec3 c_deepDark = vec3(0.5451, 0.1451, 0.0000); // #8B2500
   vec3 c_orange   = vec3(1.0000, 0.5490, 0.0000); // #FF8C00
+  vec3 c_orange2  = vec3(1.0000, 0.6471, 0.0000); // #FFA600
   vec3 c_gold     = vec3(1.0000, 0.8431, 0.0000); // #FFD700
   vec3 c_pale     = vec3(1.0000, 0.9608, 0.8784); // #FFF5E0
 
  // (outer, inner, radius)
   float circleColor = smoothstep(0.65, 1.0, radius);
   // Compose on dark base
-  vec3 color = c_deepDark;
+  // vec3 color = c_deepDark;
+  vec3 color = c_deepMid;
 
   // middle value color of circle
-  color = mix(color, c_orange, circleColor);
+  color = mix(color, c_orange2, circleColor);
 
   // wave color
   vec3 waveColor = c_cinnabar;

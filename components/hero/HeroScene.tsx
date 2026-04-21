@@ -268,7 +268,7 @@ export default function HeroScene() {
           playsInline
           preload="auto"
         >
-          <source src="/videos/flameBackdrop.mp4" type="video/mp4" />
+          <source src="/videos/thinFlame.mp4" type="video/mp4" />
         </video>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-10 block h-full w-full" />
