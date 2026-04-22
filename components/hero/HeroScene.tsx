@@ -23,6 +23,19 @@ export default function HeroScene() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const finisher = new (window as unknown as { FinisherHeader: new (opts: object) => void }).FinisherHeader({
+      count: 1,
+      size: { min: 1058, max: 1310, pulse: 1.8 },
+      speed: { x: { min: 0.6, max: 1 }, y: { min: 0.6, max: 1 } },
+      colors: { background: "#101010", particles: ["#ff681c"] },
+      blending: "lighten",
+      opacity: { center: 0.4, edge: 0 },
+      skew: 0,
+      shapes: ["c"],
+    });
+    void finisher;
+
     let frameId: number = 0;
     let cleanupScroll: (() => void) | undefined;
     let cleanupMouse: (() => void) | undefined;
@@ -239,6 +252,7 @@ export default function HeroScene() {
       animate();
     });
     return () => {
+      document.getElementById("finisher-canvas")?.remove();
       cancelled = true;
       cancelAnimationFrame(frameId);
       cleanupScroll?.();
@@ -260,16 +274,7 @@ export default function HeroScene() {
       <section className="sticky top-0 h-screen w-full overflow-hidden">
         {/* <AuroraBackdrop /> */}
         
-        <video
-          className="absolute inset-0 z-0 h-full w-full object-cover pointer-events-none"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-        >
-          <source src="/videos/thinFlame.mp4" type="video/mp4" />
-        </video>
+        <div className="finisher-header absolute inset-0 z-0 w-full h-full" />
 
         <canvas ref={canvasRef} className="absolute inset-0 z-10 block h-full w-full" />
       </section>
