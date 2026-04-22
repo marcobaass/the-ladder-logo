@@ -61,18 +61,20 @@ const RIBBONS: Ribbon[] = [
 
 export const AuroraBackdrop = () => {
   const [p, setP] = useState(0);
-  const rafRef = useRef<number>();
-  const startRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
 
   useEffect(() => {
     const animate = (timestamp: number) => {
-      if (!startRef.current) startRef.current = timestamp;
+      if (startRef.current === null) startRef.current = timestamp;
       const elapsed = (timestamp - startRef.current) / 1000; // seconds
       setP((elapsed % DURATION) / DURATION); // 0 → 1 loop
       rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current!);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
   }, []);
 
   return (
